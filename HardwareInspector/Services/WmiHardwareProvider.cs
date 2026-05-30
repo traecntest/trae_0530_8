@@ -195,19 +195,25 @@ public class WmiHardwareProvider
                 TotalSectors = SafeLong(obj["TotalSectors"])
             };
 
-            var deviceId = SafeString(obj["DeviceID"]);
-            var partQuery = $"ASSOCIATORS OF {{{{Win32_DiskDrive.DeviceID='{deviceId}'}}}} WHERE AssocClass=Win32_DiskDriveToDiskPartition";
-            using var partSearcher = new ManagementObjectSearcher(partQuery);
-            foreach (var part in partSearcher.Get())
+            try
             {
-                var partDeviceId = SafeString(part["DeviceID"]);
-                var logicalQuery = $"ASSOCIATORS OF {{{{Win32_DiskPartition.DeviceID='{partDeviceId}'}}}} WHERE AssocClass=Win32_LogicalDiskToPartition";
-                using var logicalSearcher = new ManagementObjectSearcher(logicalQuery);
-                foreach (var logical in logicalSearcher.Get())
+                var deviceId = SafeString(obj["DeviceID"]).Replace(@"\", @"\\");
+                var partQuery = $"ASSOCIATORS OF {{Win32_DiskDrive.DeviceID='{deviceId}'}} WHERE AssocClass=Win32_DiskDriveToDiskPartition";
+                using var partSearcher = new ManagementObjectSearcher(partQuery);
+                foreach (var part in partSearcher.Get())
                 {
-                    disk.FileSystem = SafeString(logical["FileSystem"]);
-                    disk.FreeSpace = SafeLong(logical["FreeSpace"]);
+                    var partDeviceId = SafeString(part["DeviceID"]);
+                    var logicalQuery = $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partDeviceId}'}} WHERE AssocClass=Win32_LogicalDiskToPartition";
+                    using var logicalSearcher = new ManagementObjectSearcher(logicalQuery);
+                    foreach (var logical in logicalSearcher.Get())
+                    {
+                        disk.FileSystem = SafeString(logical["FileSystem"]);
+                        disk.FreeSpace = SafeLong(logical["FreeSpace"]);
+                    }
                 }
+            }
+            catch
+            {
             }
 
             list.Add(disk);
@@ -218,35 +224,76 @@ public class WmiHardwareProvider
     public List<MonitorInfo> GetMonitorInfo()
     {
         var list = new List<MonitorInfo>();
-        using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DesktopMonitor");
-        foreach (var obj in searcher.Get())
-        {
-            var monitor = new MonitorInfo
-            {
-                Name = SafeString(obj["Name"]),
-                Manufacturer = SafeString(obj["MonitorManufacturer"]),
-                MonitorType = SafeString(obj["MonitorType"]),
-                SerialNumber = SafeString(obj["SerialNumber"]),
-                PixelsPerXLogicalInch = SafeInt(obj["PixelsPerXLogicalInch"])
-            };
-            list.Add(monitor);
-        }
 
         try
         {
-            using var wmiSearcher = new ManagementObjectSearcher("SELECT * FROM WmiMonitorID");
-            foreach (var obj in wmiSearcher.Get())
+            var scope = new ManagementScope(@"\\.\ROOT\WMI");
+            scope.Connect();
+            using var searcher = new ManagementObjectSearcher(scope, new ObjectQuery("SELECT * FROM WmiMonitorID"));
+            foreach (var obj in searcher.Get())
             {
                 var monitor = new MonitorInfo
                 {
                     Manufacturer = ReadWmiString(obj, "ManufacturerName"),
                     Model = ReadWmiString(obj, "ProductCodeID"),
+                    Name = ReadWmiString(obj, "UserFriendlyName"),
                     SerialNumber = ReadWmiString(obj, "SerialNumberID"),
                     MonitorId = SafeString(obj["InstanceName"]),
                     YearOfManufacture = SafeString(obj["YearOfManufacture"]),
                     WeekOfManufacture = SafeString(obj["WeekOfManufacture"])
                 };
+
+                try
+                {
+                    var instanceName = SafeString(obj["InstanceName"]).Split('_')[0];
+                    using var basicSearcher = new ManagementObjectSearcher(scope,
+                        new ObjectQuery($"SELECT * FROM WmiMonitorBasicDisplayParams WHERE InstanceName LIKE '{instanceName}%'"));
+                    foreach (var basic in basicSearcher.Get())
+                    {
+                        if (SafeBool(basic["Active"]))
+                        {
+                            monitor.Status = "OK";
+                        }
+                    }
+                }
+                catch
+                {
+                }
+
                 list.Add(monitor);
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            using var desktopSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_DesktopMonitor");
+            foreach (var obj in desktopSearcher.Get())
+            {
+                var existing = list.Count > 0 ? list[0] : null;
+                if (existing != null)
+                {
+                    if (string.IsNullOrEmpty(existing.Name))
+                        existing.Name = SafeString(obj["Name"]);
+                    if (string.IsNullOrEmpty(existing.Manufacturer))
+                        existing.Manufacturer = SafeString(obj["MonitorManufacturer"]);
+                    if (string.IsNullOrEmpty(existing.SerialNumber))
+                        existing.SerialNumber = SafeString(obj["SerialNumber"]);
+                    existing.PixelsPerXLogicalInch = SafeInt(obj["PixelsPerXLogicalInch"]);
+                }
+                else
+                {
+                    list.Add(new MonitorInfo
+                    {
+                        Name = SafeString(obj["Name"]),
+                        Manufacturer = SafeString(obj["MonitorManufacturer"]),
+                        MonitorType = SafeString(obj["MonitorType"]),
+                        SerialNumber = SafeString(obj["SerialNumber"]),
+                        PixelsPerXLogicalInch = SafeInt(obj["PixelsPerXLogicalInch"])
+                    });
+                }
             }
         }
         catch
@@ -259,9 +306,13 @@ public class WmiHardwareProvider
     public List<NetworkAdapterInfo> GetNetworkAdapterInfo()
     {
         var list = new List<NetworkAdapterInfo>();
-        using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_NetworkAdapter WHERE PhysicalAdapter=True");
+        using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_NetworkAdapter WHERE NetEnabled IS NOT NULL");
         foreach (var obj in searcher.Get())
         {
+            var physicalAdapter = obj["PhysicalAdapter"];
+            if (physicalAdapter is bool isPhysical && !isPhysical)
+                continue;
+
             var adapter = new NetworkAdapterInfo
             {
                 Name = SafeString(obj["Name"]),
@@ -275,15 +326,21 @@ public class WmiHardwareProvider
                 ConnectionStatus = GetNetConnectionStatus(SafeShort(obj["NetConnectionStatus"]))
             };
 
-            var configSearcher = new ManagementObjectSearcher(
-                $"SELECT * FROM Win32_NetworkAdapterConfiguration WHERE Index={SafeUint(obj["Index"])}");
-            foreach (var config in configSearcher.Get())
+            try
             {
-                adapter.DHCPEnabled = SafeBool(config["DHCPEnabled"]);
-                adapter.IPAddress = SafeStringArray(config["IPAddress"]);
-                adapter.SubnetMask = SafeStringArray(config["IPSubnet"]);
-                adapter.DefaultGateway = SafeStringArray(config["DefaultIPGateway"]);
-                adapter.DNSServers = SafeStringArray(config["DNSServerSearchOrder"]);
+                using var configSearcher = new ManagementObjectSearcher(
+                    $"SELECT * FROM Win32_NetworkAdapterConfiguration WHERE Index={SafeUint(obj["Index"])}");
+                foreach (var config in configSearcher.Get())
+                {
+                    adapter.DHCPEnabled = SafeBool(config["DHCPEnabled"]);
+                    adapter.IPAddress = SafeStringArray(config["IPAddress"]);
+                    adapter.SubnetMask = SafeStringArray(config["IPSubnet"]);
+                    adapter.DefaultGateway = SafeStringArray(config["DefaultIPGateway"]);
+                    adapter.DNSServers = SafeStringArray(config["DNSServerSearchOrder"]);
+                }
+            }
+            catch
+            {
             }
 
             list.Add(adapter);

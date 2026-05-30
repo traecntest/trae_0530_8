@@ -97,16 +97,34 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 SystemSummary = _wmiProvider.GetSystemSummary();
 
+                List<CpuInfo> cpus = new();
+                List<MotherboardInfo> mbs = new();
+                List<MemoryInfo> mems = new();
+                List<GpuInfo> gpus = new();
+                List<DiskInfo> disks = new();
+                List<MonitorInfo> monitors = new();
+                List<NetworkAdapterInfo> networks = new();
+                List<SoundCardInfo> sounds = new();
+
+                try { cpus = _wmiProvider.GetCpuInfo(); } catch { }
+                try { mbs = _wmiProvider.GetMotherboardInfo(); } catch { }
+                try { mems = _wmiProvider.GetMemoryInfo(); } catch { }
+                try { gpus = _wmiProvider.GetGpuInfo(); } catch { }
+                try { disks = _wmiProvider.GetDiskInfo(); } catch { }
+                try { monitors = _wmiProvider.GetMonitorInfo(); } catch { }
+                try { networks = _wmiProvider.GetNetworkAdapterInfo(); } catch { }
+                try { sounds = _wmiProvider.GetSoundCardInfo(); } catch { }
+
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    CpuList = new ObservableCollection<CpuInfo>(_wmiProvider.GetCpuInfo());
-                    MotherboardList = new ObservableCollection<MotherboardInfo>(_wmiProvider.GetMotherboardInfo());
-                    MemoryList = new ObservableCollection<MemoryInfo>(_wmiProvider.GetMemoryInfo());
-                    GpuList = new ObservableCollection<GpuInfo>(_wmiProvider.GetGpuInfo());
-                    DiskList = new ObservableCollection<DiskInfo>(_wmiProvider.GetDiskInfo());
-                    MonitorList = new ObservableCollection<MonitorInfo>(_wmiProvider.GetMonitorInfo());
-                    NetworkList = new ObservableCollection<NetworkAdapterInfo>(_wmiProvider.GetNetworkAdapterInfo());
-                    SoundList = new ObservableCollection<SoundCardInfo>(_wmiProvider.GetSoundCardInfo());
+                    CpuList = new ObservableCollection<CpuInfo>(cpus);
+                    MotherboardList = new ObservableCollection<MotherboardInfo>(mbs);
+                    MemoryList = new ObservableCollection<MemoryInfo>(mems);
+                    GpuList = new ObservableCollection<GpuInfo>(gpus);
+                    DiskList = new ObservableCollection<DiskInfo>(disks);
+                    MonitorList = new ObservableCollection<MonitorInfo>(monitors);
+                    NetworkList = new ObservableCollection<NetworkAdapterInfo>(networks);
+                    SoundList = new ObservableCollection<SoundCardInfo>(sounds);
                 });
             });
 
