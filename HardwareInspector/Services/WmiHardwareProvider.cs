@@ -131,7 +131,7 @@ public class WmiHardwareProvider
                 Manufacturer = SafeString(obj["Manufacturer"]),
                 Model = SafeString(obj["PartNumber"]),
                 SerialNumber = SafeString(obj["SerialNumber"]),
-                Capacity = SafeLong(obj["Capacity"]),
+                Capacity = (long)SafeUlong(obj["Capacity"]),
                 MemoryType = GetMemoryType(SafeUshort(obj["SMBIOSMemoryType"])),
                 Speed = SafeUint(obj["Speed"]),
                 FormFactor = GetMemoryFormFactor(SafeUshort(obj["FormFactor"])),
@@ -162,7 +162,7 @@ public class WmiHardwareProvider
                 AdapterCompatibility = SafeString(obj["AdapterCompatibility"]),
                 DriverVersion = SafeString(obj["DriverVersion"]),
                 DriverDate = SafeString(obj["DriverDate"]),
-                DedicatedVRAM = SafeLong(obj["AdapterRAM"]),
+                DedicatedVRAM = (long)SafeUlong(obj["AdapterRAM"]),
                 VideoArchitecture = GetVideoArchitecture(SafeUshort(obj["VideoArchitecture"])),
                 VideoProcessor = SafeString(obj["VideoProcessor"]),
                 CurrentRefreshRate = SafeUint(obj["CurrentRefreshRate"]),
@@ -188,11 +188,11 @@ public class WmiHardwareProvider
                 SerialNumber = SafeString(obj["SerialNumber"]),
                 Status = SafeString(obj["Status"]),
                 InterfaceType = SafeString(obj["InterfaceType"]),
-                Capacity = SafeLong(obj["Size"]),
+                Capacity = (long)SafeUlong(obj["Size"]),
                 MediaType = SafeString(obj["MediaType"]),
                 FirmwareRevision = SafeString(obj["FirmwareRevision"]),
                 Partitions = SafeInt(obj["Partitions"]),
-                TotalSectors = SafeLong(obj["TotalSectors"])
+                TotalSectors = (long)SafeUlong(obj["TotalSectors"])
             };
 
             try
@@ -208,7 +208,7 @@ public class WmiHardwareProvider
                     foreach (var logical in logicalSearcher.Get())
                     {
                         disk.FileSystem = SafeString(logical["FileSystem"]);
-                        disk.FreeSpace = SafeLong(logical["FreeSpace"]);
+                        disk.FreeSpace = (long)SafeUlong(logical["FreeSpace"]);
                     }
                 }
             }
@@ -322,7 +322,7 @@ public class WmiHardwareProvider
                 Status = SafeString(obj["NetConnectionStatus"]) == "2" ? "Connected" : "Disconnected",
                 MACAddress = SafeString(obj["MACAddress"]),
                 AdapterType = SafeString(obj["AdapterType"]),
-                Speed = FormatSpeed(SafeLong(obj["Speed"])),
+                Speed = FormatSpeed((long)SafeUlong(obj["Speed"])),
                 ConnectionStatus = GetNetConnectionStatus(SafeShort(obj["NetConnectionStatus"]))
             };
 
@@ -361,11 +361,26 @@ public class WmiHardwareProvider
                 Model = SafeString(obj["ProductName"]),
                 ProductName = SafeString(obj["ProductName"]),
                 Status = SafeString(obj["Status"]),
-                StatusInfo = SafeString(obj["StatusInfo"]),
-                DriverVersion = SafeString(obj["DriverVersion"]),
-                DriverDate = SafeString(obj["DriverDate"]),
-                DriverProvider = SafeString(obj["DriverProvider"])
+                StatusInfo = SafeString(obj["StatusInfo"])
             };
+
+            try
+            {
+                var pnpDeviceId = SafeString(obj["PNPDeviceID"]);
+                using var driverSearcher = new ManagementObjectSearcher(
+                    $"SELECT * FROM Win32_PnPSignedDriver WHERE DeviceID='{pnpDeviceId.Replace(@"\", @"\\")}'");
+                foreach (var driver in driverSearcher.Get())
+                {
+                    sound.DriverVersion = SafeString(driver["DriverVersion"]);
+                    sound.DriverDate = SafeString(driver["DriverDate"]);
+                    sound.DriverProvider = SafeString(driver["DriverProviderName"]);
+                    break;
+                }
+            }
+            catch
+            {
+            }
+
             list.Add(sound);
         }
         return list;
