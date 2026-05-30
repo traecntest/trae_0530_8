@@ -1,0 +1,229 @@
+<Window x:Class="HardwareInspector.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:HardwareInspector.ViewModels"
+        xmlns:conv="clr-namespace:HardwareInspector.Converters"
+        Title="Hardware Inspector - 硬件检测工具"
+        Width="1200" Height="800"
+        MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
+
+    <Window.Resources>
+        <conv:TemperatureToColorConverter x:Key="TempToColor"/>
+        <conv:LoadToColorConverter x:Key="LoadToColor"/>
+        <conv:StatusToBrushConverter x:Key="StatusToBrush"/>
+        <conv:BytesToReadableConverter x:Key="BytesToReadable"/>
+        <conv:SensorTypeToIconConverter x:Key="SensorIcon"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:NullToVisibilityConverter x:Key="NullToVis"/>
+        <conv:CountToVisibilityConverter x:Key="CountToVis"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="32"/>
+        </Grid.RowDefinitions>
+
+        <!-- 顶部导航栏 -->
+        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid Margin="16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🖥️" FontSize="20" Margin="0,0,8,0"/>
+                    <TextBlock Text="Hardware Inspector" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="32,0,0,0" VerticalAlignment="Center">
+                    <RadioButton Content="系统概览" IsChecked="True" GroupName="Nav"
+                                 CommandParameter="0"
+                                 Style="{StaticResource NavButtonStyle}"
+                                 Margin="0,0,4,0"/>
+                    <RadioButton Content="CPU" GroupName="Nav"
+                                 CommandParameter="1"
+                                 Style="{StaticResource NavButtonStyle}"
+                                 Margin="0,0,4,0"/>
+                    <RadioButton Content="主板" GroupName="Nav"
+                                 CommandParameter="2"
+                                 Style="{StaticResource NavButtonStyle}"
+                                 Margin="0,0,4,0"/>
+                    <RadioButton Content="内存" GroupName="Nav"
+                                 CommandParameter="3"
+                                 Style="{StaticResource NavButtonStyle}"
+                                 Margin="0,0,4,0"/>
+                    <RadioButton Content="显卡" GroupName="Nav"
+                                 CommandParameter="4"
+                                 Style="{StaticResource NavButtonStyle}"
+                                 Margin="0,0,4,0"/>
+                    <RadioButton Content="硬盘" GroupName="Nav"
+                                 CommandParameter="5"
+                                 Style="{StaticResource NavButtonStyle}"
+                                 Margin="0,0,4,0"/>
+                    <RadioButton Content="显示器" GroupName="Nav"
+                                 CommandParameter="6"
+                                 Style="{StaticResource NavButtonStyle}"
+                                 Margin="0,0,4,0"/>
+                    <RadioButton Content="网卡" GroupName="Nav"
+                                 CommandParameter="7"
+                                 Style="{StaticResource NavButtonStyle}"
+                                 Margin="0,0,4,0"/>
+                    <RadioButton Content="声卡" GroupName="Nav"
+                                 CommandParameter="8"
+                                 Style="{StaticResource NavButtonStyle}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="🔄 刷新" Command="{Binding RunScanCommand}"
+                            Style="{StaticResource ActionButton}" Margin="0,0,8,0" Padding="12,6"/>
+                    <Button Content="📄 导出TXT" Command="{Binding ExportTxtCommand}"
+                            Style="{StaticResource ActionButton}" Margin="0,0,8,0" Padding="12,6"/>
+                    <Button Content="🌐 导出HTML" Command="{Binding ExportHtmlCommand}"
+                            Style="{StaticResource ActionButton}" Padding="12,6"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 主内容区域 -->
+        <Grid Grid.Row="1" Margin="16">
+            <Grid.Resources>
+                <Style x:Key="NavButtonStyle" TargetType="RadioButton">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="Padding" Value="12,6"/>
+                    <Setter Property="FontSize" Value="13"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="RadioButton">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#1E2D3D"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Grid.Resources>
+
+            <!-- 系统概览页面 -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding SelectedPageIndex, Converter={StaticResource IntToVis}, ConverterParameter=0}">
+                <StackPanel>
+                    <!-- 传感器仪表盘 -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="实时监控" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,16"/>
+                            <UniformGrid Columns="4">
+                                <StackPanel HorizontalAlignment="Center" Margin="8">
+                                    <TextBlock Text="CPU 温度" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding CpuTemperature, StringFormat={}{0:F1}°C}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4"
+                                               Foreground="{Binding CpuTemperature, Converter={StaticResource TempToColor}}"/>
+                                </StackPanel>
+                                <StackPanel HorizontalAlignment="Center" Margin="8">
+                                    <TextBlock Text="CPU 负载" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding CpuLoad, StringFormat={}{0:F1}%%}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4"
+                                               Foreground="{Binding CpuLoad, Converter={StaticResource LoadToColor}}"/>
+                                </StackPanel>
+                                <StackPanel HorizontalAlignment="Center" Margin="8">
+                                    <TextBlock Text="GPU 温度" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding GpuTemperature, StringFormat={}{0:F1}°C}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4"
+                                               Foreground="{Binding GpuTemperature, Converter={StaticResource TempToColor}}"/>
+                                </StackPanel>
+                                <StackPanel HorizontalAlignment="Center" Margin="8">
+                                    <TextBlock Text="内存使用" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding MemoryUsagePercent, StringFormat={}{0:F1}%%}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4"
+                                               Foreground="{Binding MemoryUsagePercent, Converter={StaticResource LoadToColor}}"/>
+                                </StackPanel>
+                            </UniformGrid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 系统信息概要 -->
+                    <Border Style="{StaticResource CardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="系统概览" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,16"/>
+                            <UniformGrid Columns="2">
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="计算机名" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.ComputerName}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="操作系统" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.OperatingSystem}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="系统版本" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock FontSize="14" FontWeight="Medium" Margin="0,2,0,8">
+                                        <Run Text="{Binding SystemSummary.OSVersion, Mode=OneWay}"/>
+                                        <Run Text=" Build "/>
+                                        <Run Text="{Binding SystemSummary.OSBuild, Mode=OneWay}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="运行时间" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.Uptime}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="系统制造商" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.SystemManufacturer}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="系统型号" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.SystemModel}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="处理器" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.Processor}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="总物理内存" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.TotalPhysicalMemory}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="BIOS版本" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.BIOSVersion}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,8">
+                                    <TextBlock Text="系统类型" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding SystemSummary.SystemType}" FontSize="14" FontWeight="Medium" Margin="0,2,0,8"/>
+                                </StackPanel>
+                            </UniformGrid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- 底部状态栏 -->
+        <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <Grid Margin="16,0">
+                <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Margin="0,0,6,0"
+                             Fill="{Binding IsSensorRunning, Converter={StaticResource BoolToColor}}"/>
+                    <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center">
+                        <Run Text="传感器: "/>
+                        <Run Text="{Binding IsSensorRunning, Mode=OneWay, Converter={StaticResource BoolToText}}"/>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
