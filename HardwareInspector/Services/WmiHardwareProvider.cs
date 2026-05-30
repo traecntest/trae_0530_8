@@ -20,7 +20,7 @@ public class WmiHardwareProvider
             summary.OSVersion = SafeString(obj["Version"]);
             summary.OSBuild = SafeString(obj["BuildNumber"]);
             var totalMem = SafeUlong(obj["TotalVisibleMemorySize"]);
-            summary.TotalPhysicalMemory = FormatBytes(totalMem * 1024);
+            summary.TotalPhysicalMemory = FormatBytes((long)(totalMem * 1024UL));
         }
 
         using var csQuery = new ManagementObjectSearcher("SELECT * FROM Win32_ComputerSystem");
@@ -195,12 +195,14 @@ public class WmiHardwareProvider
                 TotalSectors = SafeLong(obj["TotalSectors"])
             };
 
-            using var partSearcher = new ManagementObjectSearcher(
-                $"ASSOCIATORS OF {{Win32_DiskDrive.DeviceID='{SafeString(obj["DeviceID"]}'}} WHERE AssocClass=Win32_DiskDriveToDiskPartition");
+            var deviceId = SafeString(obj["DeviceID"]);
+            var partQuery = $"ASSOCIATORS OF {{{{Win32_DiskDrive.DeviceID='{deviceId}'}}}} WHERE AssocClass=Win32_DiskDriveToDiskPartition";
+            using var partSearcher = new ManagementObjectSearcher(partQuery);
             foreach (var part in partSearcher.Get())
             {
-                using var logicalSearcher = new ManagementObjectSearcher(
-                    $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{SafeString(part["DeviceID"]}'}} WHERE AssocClass=Win32_LogicalDiskToPartition");
+                var partDeviceId = SafeString(part["DeviceID"]);
+                var logicalQuery = $"ASSOCIATORS OF {{{{Win32_DiskPartition.DeviceID='{partDeviceId}'}}}} WHERE AssocClass=Win32_LogicalDiskToPartition";
+                using var logicalSearcher = new ManagementObjectSearcher(logicalQuery);
                 foreach (var logical in logicalSearcher.Get())
                 {
                     disk.FileSystem = SafeString(logical["FileSystem"]);
@@ -359,7 +361,7 @@ public class WmiHardwareProvider
         return string.Empty;
     }
 
-    private static string ReadWmiString(ManagementObject obj, string propertyName)
+    private static string ReadWmiString(ManagementBaseObject obj, string propertyName)
     {
         try
         {

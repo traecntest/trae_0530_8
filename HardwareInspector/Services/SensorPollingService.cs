@@ -1,12 +1,13 @@
 using System.Collections.Concurrent;
 using HardwareInspector.Models;
-using LibreHardwareMonitor.Hardware;
+using LhmSensorType = LibreHardwareMonitor.Hardware.SensorType;
+using LhmHardware = LibreHardwareMonitor.Hardware;
 
 namespace HardwareInspector.Services;
 
 public class SensorPollingService : IDisposable
 {
-    private readonly Computer _computer;
+    private readonly LhmHardware.Computer _computer;
     private readonly ConcurrentDictionary<string, List<SensorData>> _sensorCache = new();
     private readonly CancellationTokenSource _cts = new();
     private Task? _pollingTask;
@@ -19,7 +20,7 @@ public class SensorPollingService : IDisposable
     public SensorPollingService(int pollingIntervalMs = 1000)
     {
         _pollingIntervalMs = pollingIntervalMs;
-        _computer = new Computer
+        _computer = new LhmHardware.Computer
         {
             IsCpuEnabled = true,
             IsGpuEnabled = true,
@@ -53,16 +54,17 @@ public class SensorPollingService : IDisposable
         {
             try
             {
-                _computer.Accept(new UpdateVisitor());
-
                 foreach (var hardware in _computer.Hardware)
                 {
+                    hardware.Update();
+
                     var sensors = CollectSensors(hardware);
                     var key = hardware.Identifier.ToString();
                     _sensorCache.AddOrUpdate(key, sensors, (_, _) => sensors);
 
                     foreach (var subHardware in hardware.SubHardware)
                     {
+                        subHardware.Update();
                         var subSensors = CollectSensors(subHardware);
                         var subKey = subHardware.Identifier.ToString();
                         _sensorCache.AddOrUpdate(subKey, subSensors, (_, _) => subSensors);
@@ -84,7 +86,7 @@ public class SensorPollingService : IDisposable
         }
     }
 
-    private static List<SensorData> CollectSensors(IHardware hardware)
+    private static List<SensorData> CollectSensors(LhmHardware.IHardware hardware)
     {
         var list = new List<SensorData>();
 
@@ -106,32 +108,32 @@ public class SensorPollingService : IDisposable
         return list;
     }
 
-    private static SensorType MapSensorType(SensorType lhmsType)
+    private static SensorType MapSensorType(LhmSensorType lhmsType)
     {
         return lhmsType switch
         {
-            LibreHardwareMonitor.Hardware.SensorType.Temperature => SensorType.Temperature,
-            LibreHardwareMonitor.Hardware.SensorType.Voltage => SensorType.Voltage,
-            LibreHardwareMonitor.Hardware.SensorType.Fan => SensorType.FanSpeed,
-            LibreHardwareMonitor.Hardware.SensorType.Load => SensorType.Load,
-            LibreHardwareMonitor.Hardware.SensorType.Power => SensorType.Power,
-            LibreHardwareMonitor.Hardware.SensorType.Clock => SensorType.Clock,
-            LibreHardwareMonitor.Hardware.SensorType.Data => SensorType.Data,
+            LhmSensorType.Temperature => SensorType.Temperature,
+            LhmSensorType.Voltage => SensorType.Voltage,
+            LhmSensorType.Fan => SensorType.FanSpeed,
+            LhmSensorType.Load => SensorType.Load,
+            LhmSensorType.Power => SensorType.Power,
+            LhmSensorType.Clock => SensorType.Clock,
+            LhmSensorType.Data => SensorType.Data,
             _ => SensorType.Data
         };
     }
 
-    private static string GetUnit(SensorType lhmsType)
+    private static string GetUnit(LhmSensorType lhmsType)
     {
         return lhmsType switch
         {
-            LibreHardwareMonitor.Hardware.SensorType.Temperature => "°C",
-            LibreHardwareMonitor.Hardware.SensorType.Voltage => "V",
-            LibreHardwareMonitor.Hardware.SensorType.Fan => "RPM",
-            LibreHardwareMonitor.Hardware.SensorType.Load => "%",
-            LibreHardwareMonitor.Hardware.SensorType.Power => "W",
-            LibreHardwareMonitor.Hardware.SensorType.Clock => "MHz",
-            LibreHardwareMonitor.Hardware.SensorType.Data => "GB",
+            LhmSensorType.Temperature => "°C",
+            LhmSensorType.Voltage => "V",
+            LhmSensorType.Fan => "RPM",
+            LhmSensorType.Load => "%",
+            LhmSensorType.Power => "W",
+            LhmSensorType.Clock => "MHz",
+            LhmSensorType.Data => "GB",
             _ => ""
         };
     }
